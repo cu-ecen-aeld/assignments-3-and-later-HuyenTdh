@@ -18,9 +18,9 @@ then
     exit 1
 fi
 
-grep $searchstr -R $filesdir > find_result.txt
+grep $searchstr -r $filesdir > /tmp/find_result.txt
 
-input="find_result.txt"
+input="/tmp/find_result.txt"
 
 while read -r line
 do
@@ -38,5 +38,5 @@ then
     exit 1
 fi
 
-rm -rf find_result.txt
+rm -rf /tmp/find_result.txt
 echo "The number of files are $num_file and the number of matching lines are $num_line"
