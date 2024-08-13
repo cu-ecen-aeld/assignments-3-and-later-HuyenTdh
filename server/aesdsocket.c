@@ -26,7 +26,8 @@ char *send_buff;
 
 void pr_err(char *msg, char ret);
 static void signal_handler(int signum);
-char find_char(char *src, char expect, unsigned char size);
+unsigned char find_char(char *src, char expect, unsigned char size);
+void print_arr(char *arr, int size);
 
 int main(int argc, char **argv)
 {
@@ -36,15 +37,14 @@ int main(int argc, char **argv)
 	int err;
 	char ip[INET_ADDRSTRLEN];	
 	ssize_t size;
-	ssize_t total_size = 0;
 	ssize_t ret;
 	struct sigaction sig;
 	char is_deamons = 0;
 	pid_t pid;
 	int opt = 1;
-	ssize_t file_size = 0;
 	char buffer[MAX_BUFFER];
-	char end_line = -1;
+	unsigned char end_line = 0xFF;
+	int total_size;
 
 	memset((char *)&sig, 0, sizeof(struct sigaction));
 	sig.sa_handler = signal_handler;
@@ -115,45 +115,38 @@ int main(int argc, char **argv)
 			output = open(OUTPUT_FILE, O_RDWR|O_CREAT|O_APPEND, 0666);
 		if (output == -1)
 			return -1;
-		while ((size = recv(cli_fd, buffer, MAX_BUFFER, 0)) > 0)
-		{
-			total_size += size;
-			ret = write(output, buffer, size);
-			if (ret < size)
-				pr_err("Write to output fail\r\n", -1);
 
-			end_line = find_char(buffer, '\n', MAX_BUFFER);
-			if (end_line != -1) {
-				memset(buffer, 0, MAX_BUFFER);
-				if ((file_size = lseek(output, 0, SEEK_END)) == -1)
-					pr_err("lseek fail\r\n", -1);
-				send_buff = malloc(file_size);
-				
-				if (send_buff == NULL) {
-					printf("Cannot allocate send buffer\r\n");
-					exit(-1);
-				}
-				if (lseek(output, 0, SEEK_SET) == -1) {
-					printf("lseek fail\r\n");
-					free(send_buff);
-					exit(-1);
-				}
-				ret = read(output, send_buff, file_size);
-				if (ret < 0) {
-					printf("Read fail\r\n");
-					free(send_buff);
-					exit(-1);
-				}
-				send(cli_fd, send_buff, file_size, 0);
-				free(send_buff);
-
-				close(cli_fd);
-				break;
+		while (1) {
+			memset(buffer, 0, MAX_BUFFER);
+			size = recv(cli_fd, buffer, MAX_BUFFER, 0);
+			if (size > 0) {
+				ret = write(output, buffer, size);
+				if (ret < size)
+					pr_err("Write to output fail\r\n", -1);
+				end_line = find_char(buffer, '\n', MAX_BUFFER);
+				if (end_line != 0xFF)
+					break;
 			}
 		}
+
+		if (lseek(output, 0, SEEK_SET) == -1) {
+			printf("lseek fail\r\n");
+			exit(-1);
+		}
+
+		do{
+			memset(buffer, 0, MAX_BUFFER);
+			ret = read(output, buffer, MAX_BUFFER);
+			if (ret < 0) {
+				printf("Read fail\r\n");
+				exit(-1);
+			}
+			send(cli_fd, buffer, ret, 0);
+		}while(ret > 0);
+		close(cli_fd);
+
 		syslog(LOG_USER, "Closed connection from %s\r\n", ip);
 	}
-
 	return 0;
 }
 
@@ -161,6 +154,7 @@ static void signal_handler(int signum)
 {
 	if (signum == SIGINT || signum == SIGTERM) {
 		syslog(LOG_USER, "Caught signal, exiting\r\n");
+		free(send_buff);
 		freeaddrinfo(res);
 		closelog();
 		close(fd);
@@ -178,14 +172,23 @@ void pr_err(char *msg, char ret)
 	exit(ret);
 }
 
-char find_char(char *src, char expect, unsigned char size)
+unsigned char find_char(char *src, char expect, unsigned char size)
 {
 	unsigned char i = 0;
 
 	for (i=0; i<size; i++)
 	{
 		if (src[i] == expect)
-			return 0;
+			return i;
 	}
-	return -1;
+	return 0xFF;
+}
+
+void print_arr(char *arr, int size)
+{
+	int i = 0;
+
+	for (i=0; i<size; i++) {
+		printf("%c",arr[i]);
+	}
 }
