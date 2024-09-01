@@ -33,29 +33,6 @@ size_t aesd_circular_buffer_total_size(struct aesd_circular_buffer *buffer)
     return size;
 }
 
-/* size_t aesd_circular_buffer_add_data(struct aesd_circular_buffer *buffer, char *data, int data_size)
-{
-    int tmp;
-    if (buffer->entry[buffer->in_offs].buffptr == NULL) {
-        buffer->entry[buffer->in_offs].buffptr = kmalloc(data_size, GFP_KERNEL);
-	if (buffer->entry[buffer->in_offs].buffptr == NULL)
-	    return -ENOMEM;
-	buffer->entry[buffer->in_offs].size = data_size;
-	tmp = 0;
-    }
-    else {
-        buffer->entry[buffer->in_offs].buffptr = krealloc(data_size + buffer->entry[buffer->in_offs].size,\
-		       	GFP_KERNEL);
-	if (buffer->entry[buffer->in_offs].buffptr == NULL)
-            return -ENOMEM;
-	tmp = buffer->entry[buffer->in_offs].size;
-        buffer->entry[buffer->in_offs].size += data_size;
-    }
-    memcpy(&buffer->entry[buffer->in_offs].buffptr[tmp], data, data_size);
-
-    return data_size;
-} */
-
 /**
  * @param buffer the buffer to search for corresponding offset.  Any necessary locking must be performed by caller.
  * @param char_offset the position to search for in the buffer list, describing the zero referenced
