@@ -70,7 +70,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     ssize_t retval = 0;
     struct aesd_dev *aesd_device = filp->private_data;
     struct aesd_buffer_entry *entry;
-    char *buffptr;
+    char *tmp;
     size_t entry_offset = 0;
     size_t total_size = 0;
     size_t buff_offset = 0;
@@ -85,22 +85,28 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     if ((*f_pos + count) > total_size) {
         count = total_size - *f_pos;
     }
-    buffptr = kmalloc(count, GFP_KERNEL);
-    if (buffptr == NULL) {
+    tmp = kmalloc(count, GFP_KERNEL);
+    if (tmp == NULL) {
         mutex_unlock(&aesd_device->lock);
         return -ENOMEM;
     }
     for (i = 0; i < count; i++) {
         entry = aesd_circular_buffer_find_entry_offset_for_fpos(&aesd_device->buffer, *f_pos, &entry_offset);
-        buffptr[i] = entry->buffptr[entry_offset];
-        (*f_pos)++;
+        if (entry == NULL) {
+            pr_err("Cannot get buffer");
+            mutex_unlock(&aesd_device->lock);
+            kfree(tmp);
+            return -EFAULT;
+        }
+        tmp[i] = entry->buffptr[entry_offset];
+        *f_pos += 1;
     }
-    if (copy_to_user(buf, buffptr, count))
+    if (copy_to_user(buf, tmp, count))
         retval = -EFAULT;
     else
         retval = count;
     mutex_unlock(&aesd_device->lock);
-    kfree(buffptr);
+    kfree(tmp);
 
     return retval;
 }
