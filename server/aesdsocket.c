@@ -21,7 +21,12 @@
 #include "aesdsocket.h"
 
 #define PORT "9000"
+
+#ifdef USE_AESD_CHAR_DEVICE
+#define OUTPUT_FILE "/dev/aesdchar"
+#else
 #define OUTPUT_FILE "/var/tmp/aesdsocketdata"
+#endif
 #define MAX_BUFFER 100
 
 struct {
@@ -35,7 +40,7 @@ int cli_fd;
 
 static void signal_handler(int signum);
 void* thread_func(void *param);
-static void timer_func(union sigval thread_param);
+/* static void timer_func(union sigval thread_param); */
 
 int main(int argc, char **argv)
 {
@@ -51,7 +56,7 @@ int main(int argc, char **argv)
 	pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 	struct slist_data_s ret;
 	struct slist_data_s *is_success;
-	timer_t tim_id;
+	/* timer_t tim_id; */
 
 	cli_addr_len = sizeof(struct sockaddr);
 	shared_data.fd = open(OUTPUT_FILE, O_RDWR|O_CREAT|O_APPEND, 0666);
@@ -115,8 +120,8 @@ int main(int argc, char **argv)
 		return -1;
 	data_init();
 
-	if (timer_init(&tim_id, 10, NULL) == 0xFF)
-		return -1;
+/* 	if (timer_init(&tim_id, 10, NULL) == 0xFF)
+		return -1; */
 
 	while (1)
 	{
@@ -248,7 +253,7 @@ void print_arr(char *arr, int size)
 	}
 }
 
-char timer_init(timer_t *tim_id, unsigned int time, void *thread_param)
+/* char timer_init(timer_t *tim_id, unsigned int time, void *thread_param)
 {
 	struct sigevent ev;
 	struct itimerspec interval_tim;
@@ -297,3 +302,4 @@ void timer_func(union sigval thread_param)
 
 	return;
 }
+ */
