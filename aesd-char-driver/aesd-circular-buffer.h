@@ -53,8 +53,6 @@ struct aesd_circular_buffer
 
 extern size_t aesd_circular_buffer_total_size(struct aesd_circular_buffer *buffer);
 
-extern size_t aesd_circular_buffer_add_data(struct aesd_circular_buffer *buffer, char *data, int data_size);
-
 extern struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct aesd_circular_buffer *buffer,
             size_t char_offset, size_t *entry_offset_byte_rtn );
 
