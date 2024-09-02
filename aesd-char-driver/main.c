@@ -28,17 +28,9 @@ int aesd_minor =   0;
 MODULE_AUTHOR("Huyen Do Van"); /** TODO: fill in your name **/
 MODULE_LICENSE("Dual BSD/GPL");
 
+static char *buffptr;
+static size_t size;
 struct aesd_dev aesd_device;
-
-static int aesd_find_new_line(char *buf, int start, int size)
-{
-    int i = -1;
-    for (i = start; i < size; i++) {
-        if (buf[i] == '\n')
-            return i;
-    }
-    return -1;
-}
 
 int aesd_open(struct inode *inode, struct file *filp)
 {
@@ -68,37 +60,35 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     ssize_t retval = 0;
     struct aesd_dev *aesd_device = filp->private_data;
     struct aesd_buffer_entry *entry;
+    char *tmp;
     size_t entry_offset = 0;
     size_t total_size = 0;
-    size_t buff_offset = 0;
+    size_t i;
 
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle read
      */
     mutex_lock(&aesd_device->lock);
-    total_size = aesd_circular_buffer_total_size(&aesd_device->buffer);
-    if ((*f_pos + count) > total_size) {
-        count = total_size - *f_pos;
+    tmp = kmalloc(count, GFP_KERNEL);
+    if (tmp == NULL) {
+        mutex_unlock(&aesd_device->lock);
+        return -ENOMEM;
     }
-    do {
+    for (i = 0; i < count; i++) {
         entry = aesd_circular_buffer_find_entry_offset_for_fpos(&aesd_device->buffer, *f_pos, &entry_offset);
-        if (entry == NULL)
-            return -EFAULT;
-        if (count > (entry->size - entry_offset)) {
-            if (retval += copy_to_user(buf + buff_offset, &entry->buffptr[entry_offset], entry->size - entry_offset))
-                return -EFAULT;
-            *f_pos += entry->size - entry_offset;
-            buff_offset += entry->size - entry_offset;
-            count -= entry->size - entry_offset;
-        }else {
-            if (retval += copy_to_user(buf + buff_offset, &entry->buffptr[entry_offset], count))
-                return -EFAULT;
-            *f_pos += count;
-            count = 0;
+        if (entry == NULL) {
+            break;
         }
-    }while (count > 0);
+        tmp[i] = entry->buffptr[entry_offset];
+        *f_pos += 1;
+    }
+    if (copy_to_user(buf, tmp, i))
+        retval = -EFAULT;
+    else
+        retval = i;
     mutex_unlock(&aesd_device->lock);
+    kfree(tmp);
 
     return retval;
 }
@@ -108,9 +98,10 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 {
     ssize_t retval = -ENOMEM;
     struct aesd_dev *aesd_device = filp->private_data;
+    struct aesd_buffer_entry entry;
     char *tmp = NULL;
     int i = 0;
-    int d = 0;
+
     PDEBUG("write %zu bytes with offset %lld",count,*f_pos);
     /**
      * TODO: handle write
@@ -118,67 +109,31 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     tmp = kmalloc(count, GFP_KERNEL);
     if (tmp == NULL)
         return retval;
-    if ((retval = copy_from_user(tmp, buf, count))) {
+    if (copy_from_user(tmp, buf, count)) {
         kfree(tmp);
         return -EFAULT;
     }
+    retval = count;
 
     mutex_lock(&aesd_device->lock);
-    do {
-        i = aesd_find_new_line(tmp, d, retval);
-        if (i != -1) {
-            if (aesd_device->tmp.buffptr == NULL) {
-                aesd_device->tmp.buffptr = kmalloc(i - d + 1, GFP_KERNEL);
-                if (aesd_device->tmp.buffptr == NULL) {
-                    kfree(tmp);
-                    pr_err("adc");
-                    return -ENOMEM;
-                }
-                aesd_device->tmp.size = i - d + 1;
-                memcpy(aesd_device->tmp.buffptr, &tmp[d], aesd_device->tmp.size);
-            } else {
-                aesd_device->tmp.buffptr = krealloc(aesd_device->tmp.buffptr,\
-                    aesd_device->tmp.size + i - d + 1, GFP_KERNEL);
-                if (aesd_device->tmp.buffptr == NULL) {
-                    kfree(tmp);
-                    pr_err("New line allocate");
-                    return -ENOMEM;
-                }
-                memcpy(&aesd_device->tmp.buffptr[aesd_device->tmp.size], &tmp[d], i - d + 1);
-                aesd_device->tmp.size += i - d + 1;
-            }
-            if (aesd_device->buffer.full)
-                kfree(aesd_device->buffer.entry[aesd_device->buffer.in_offs].buffptr);
-
-            aesd_circular_buffer_add_entry(&aesd_device->buffer, &aesd_device->tmp);
-            d = i + 1;
-            aesd_device->tmp.buffptr = NULL;
-            aesd_device->tmp.size = 0;
+    for (i = 0; i < retval; i++) {
+        buffptr = krealloc(buffptr, size + 1, GFP_KERNEL);
+        if (buffptr == NULL) {
+            PDEBUG("Cannot allocate");
+            kfree(tmp);
+            return -ENOMEM;
         }
-        else {
-            if (aesd_device->tmp.buffptr == NULL) {
-                aesd_device->tmp.buffptr = kmalloc(retval - d, GFP_KERNEL);
-                if (aesd_device->tmp.buffptr == NULL)
-                    return -ENOMEM;
-                memcpy(aesd_device->tmp.buffptr, &tmp[d], retval - d);
-                aesd_device->tmp.size = retval - d;
-            } else {
-                aesd_device->tmp.buffptr = krealloc(aesd_device->tmp.buffptr,\
-                                aesd_device->tmp.size + retval - d + 1, GFP_KERNEL);
-                if (aesd_device->tmp.buffptr == NULL) {
-                    kfree(tmp);
-                    pr_err("Realloc fail");
-                    return -ENOMEM;
-                }
-                memcpy(&aesd_device->tmp.buffptr[aesd_device->tmp.size], &tmp[d], retval - d + 1);
-                aesd_device->tmp.size += retval - d + 1;
-            }
-            break;
+        buffptr[size] = tmp[i];
+        size += 1;
+        if (tmp[i] == '\n') {
+            entry.buffptr = buffptr;
+            entry.size = size;
+            *f_pos += size;
+            aesd_circular_buffer_add_entry(&aesd_device->buffer, &entry);
+            buffptr = NULL;
+            size = 0;
         }
-        if (i + 1 == retval)
-            break;
-    } while (i != -1);
-    *f_pos += retval;
+    }
     mutex_unlock(&aesd_device->lock);
     kfree(tmp);
     return retval;
