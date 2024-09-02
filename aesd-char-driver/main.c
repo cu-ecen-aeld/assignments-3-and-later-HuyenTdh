@@ -78,10 +78,6 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     for (i = 0; i < count; i++) {
         entry = aesd_circular_buffer_find_entry_offset_for_fpos(&aesd_device->buffer, *f_pos, &entry_offset);
         if (entry == NULL) {
-/*             pr_err("Cannot get buffer");
-            mutex_unlock(&aesd_device->lock);
-            kfree(tmp);
-            return -EFAULT; */
             break;
         }
         tmp[i] = entry->buffptr[entry_offset];
@@ -134,7 +130,6 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
             entry.size = size;
             *f_pos += size;
             aesd_circular_buffer_add_entry(&aesd_device->buffer, &entry);
-            pr_err("%s", aesd_device->buffer.entry[aesd_device->buffer.in_offs - 1].buffptr);
             buffptr = NULL;
             size = 0;
         }
