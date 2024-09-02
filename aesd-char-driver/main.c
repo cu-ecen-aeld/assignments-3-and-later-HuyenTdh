@@ -32,16 +32,6 @@ static char *buffptr;
 static size_t size;
 struct aesd_dev aesd_device;
 
-static int aesd_find_new_line(char *buf, int start, int size)
-{
-    int i = -1;
-    for (i = start; i < size; i++) {
-        if (buf[i] == '\n')
-            return i;
-    }
-    return -1;
-}
-
 int aesd_open(struct inode *inode, struct file *filp)
 {
     struct aesd_dev *aesd_device;
@@ -73,7 +63,6 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     char *tmp;
     size_t entry_offset = 0;
     size_t total_size = 0;
-    size_t buff_offset = 0;
     size_t i;
 
     PDEBUG("read %zu bytes with offset %lld",count,*f_pos);
@@ -81,10 +70,6 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
      * TODO: handle read
      */
     mutex_lock(&aesd_device->lock);
-    total_size = aesd_circular_buffer_total_size(&aesd_device->buffer);
-    if ((*f_pos + count) > total_size) {
-        count = total_size - *f_pos;
-    }
     tmp = kmalloc(count, GFP_KERNEL);
     if (tmp == NULL) {
         mutex_unlock(&aesd_device->lock);
@@ -93,18 +78,19 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     for (i = 0; i < count; i++) {
         entry = aesd_circular_buffer_find_entry_offset_for_fpos(&aesd_device->buffer, *f_pos, &entry_offset);
         if (entry == NULL) {
-            pr_err("Cannot get buffer");
+/*             pr_err("Cannot get buffer");
             mutex_unlock(&aesd_device->lock);
             kfree(tmp);
-            return -EFAULT;
+            return -EFAULT; */
+            break;
         }
         tmp[i] = entry->buffptr[entry_offset];
         *f_pos += 1;
     }
-    if (copy_to_user(buf, tmp, count))
+    if (copy_to_user(buf, tmp, i))
         retval = -EFAULT;
     else
-        retval = count;
+        retval = i;
     mutex_unlock(&aesd_device->lock);
     kfree(tmp);
 
@@ -148,6 +134,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
             entry.size = size;
             *f_pos += size;
             aesd_circular_buffer_add_entry(&aesd_device->buffer, &entry);
+            pr_err("%s", aesd_device->buffer.entry[aesd_device->buffer.in_offs - 1].buffptr);
             buffptr = NULL;
             size = 0;
         }
