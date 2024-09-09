@@ -26,11 +26,35 @@ size_t aesd_circular_buffer_total_size(struct aesd_circular_buffer *buffer)
     size_t size = 0;
     uint8_t i = 0;
 
-    for (i = 0; i < (buffer->in_offs - buffer->out_offs); i++) {
-        size += buffer->entry[buffer->out_offs].size;
+    if (buffer->full) {
+        for (i = 0; i < 10; i++) {
+            size += buffer->entry[i].size;
+        }
+        return size;
     }
 
+    for (i = buffer->out_offs; i < (AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED * 2); i++) {
+        size += buffer->entry[(buffer->out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED].size;
+        if ((i % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) == buffer->in_offs)
+            break;
+    }
     return size;
+}
+
+unsigned char aesd_circular_buffer_get_total_cmds(struct aesd_circular_buffer *buffer)
+{
+    unsigned char res = 0;
+    uint8_t i;
+
+    if (buffer->full)
+        return AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+
+    for (i = buffer->out_offs; i < (AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED * 2); i++) {
+        res++;
+        if ((i % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) == buffer->in_offs)
+            break;
+    }
+    return res;
 }
 
 /**
