@@ -2,7 +2,7 @@
 
 SRC := aesdsocket.c data_management.c
 CC ?=${CROSS_COMPILE}gcc
-CFLAGS ?=-O0 -g -Wall
+CFLAGS ?=-O0 -g -Wall -DUSE_AESD_CHAR_DEVICE
 TARGET ?= aesdsocket
 LDFLAGS ?= -lpthread -lrt
 OBJS := $(SRC:.c=.o)

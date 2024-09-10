@@ -16,6 +16,7 @@
 #include <stdlib.h>
 
 #include <sys/queue.h>
+#include <sys/ioctl.h>
 
 #include "data_management.h"
 #include "aesdsocket.h"
