@@ -61,9 +61,6 @@ int main(int argc, char **argv)
     /* timer_t tim_id; */
 
     cli_addr_len = sizeof(struct sockaddr);
-    shared_data.fd = open(OUTPUT_FILE, O_RDWR|O_CREAT|O_APPEND, 0666);
-    if (shared_data.fd == -1)
-        return -1;
     shared_data.mutex = &mtx;
 
     memset((char *)&sig, 0, sizeof(struct sigaction));
@@ -163,7 +160,11 @@ void* thread_func(void *param)
     ssize_t max = MAX_BUFFER;
     off_t file_size;
     struct aesd_seekto tmp;
+    int dev_fd;
 
+    dev_fd = open(OUTPUT_FILE, O_RDWR|O_CREAT|O_APPEND, 0666);
+    if (dev_fd == -1)
+        return -1;
     data->tid = pthread_self();
     buffer = malloc(MAX_BUFFER);
     if (buffer == NULL)
@@ -185,18 +186,18 @@ void* thread_func(void *param)
 
     pthread_mutex_lock(shared_data.mutex);
     if (sscanf(buffer, "AESDCHAR_IOCSEEKTO:%u,%u", &tmp.write_cmd, &tmp.write_cmd_offset)) {
-        file_size = lseek(shared_data.fd, 0, SEEK_END);
-        if (ioctl(shared_data.fd, AESDCHAR_IOCSEEKTO , &tmp) == -1) {
+        file_size = lseek(dev_fd, 0, SEEK_END);
+        if (ioctl(dev_fd, AESDCHAR_IOCSEEKTO , &tmp) == -1) {
             syslog(LOG_USER, "ioctl fail\r\n");
             pthread_mutex_unlock(shared_data.mutex);
             data->success = 2;
 	    free(buffer);
             return param;
         }
-	file_size -= lseek(shared_data.fd, 0, SEEK_CUR);
+	file_size -= lseek(dev_fd, 0, SEEK_CUR);
         buffer = realloc(buffer, file_size);
         memset(buffer, 0, file_size);
-        ret = read(shared_data.fd, buffer, file_size);
+        ret = read(dev_fd, buffer, file_size);
         if (ret < 0) {
             printf("Read fail\r\n");
             pthread_mutex_unlock(shared_data.mutex);
@@ -206,7 +207,7 @@ void* thread_func(void *param)
         }
     }
     else {
-        ret = write(shared_data.fd, buffer, total);
+        ret = write(dev_fd, buffer, total);
         if (ret < total) {
             printf("Write to output fail\r\n");
             syslog(LOG_USER, "Write to output fail\r\n");
@@ -215,9 +216,9 @@ void* thread_func(void *param)
 	    free(buffer);
             return param;
         }
-        file_size = lseek(shared_data.fd, 0, SEEK_END);
+        file_size = lseek(dev_fd, 0, SEEK_END);
 
-        if (lseek(shared_data.fd, 0, SEEK_SET) == -1) {
+        if (lseek(dev_fd, 0, SEEK_SET) == -1) {
             printf("lseek fail\r\n");
             pthread_mutex_unlock(shared_data.mutex);
             data->success = 2;
@@ -227,7 +228,7 @@ void* thread_func(void *param)
 
         buffer = realloc(buffer, file_size);
         memset(buffer, 0, file_size);
-        ret = read(shared_data.fd, buffer, file_size);
+        ret = read(dev_fd, buffer, file_size);
         if (ret < 0) {
             printf("Read fail\r\n");
             pthread_mutex_unlock(shared_data.mutex);
@@ -240,6 +241,7 @@ void* thread_func(void *param)
     send(data->cli_fd, buffer, ret, 0);
     data->success = 1;
     free(buffer);
+    close(dev_fd);
     return param;
 }
 
