@@ -185,7 +185,7 @@ void* thread_func(void *param)
     pthread_mutex_lock(shared_data.mutex);
     if (sscanf(buffer, "AESDCHAR_IOCSEEKTO:%u,%u", &tmp.write_cmd, &tmp.write_cmd_offset)) {
         file_size = lseek(shared_data.fd, 0, SEEK_END);
-        if (ioctl(shared_data.fd, AESDCHAR_IOCSEEKTO , &tmp) == -1) {
+        if (ioctl(shared_data.fd, AESDCHAR_IOCSEEKTO , &tmp) != 0) {
 	    printf("ioctl fail\r\n");
             syslog(LOG_USER, "ioctl fail\r\n");
             pthread_mutex_unlock(shared_data.mutex);

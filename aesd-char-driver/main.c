@@ -212,7 +212,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     }
     PDEBUG("ioctl pos: %ld", f_pos);
     filp->f_pos = f_pos;
-    return f_pos;
+    return 0;
 }
 
 struct file_operations aesd_fops = {
