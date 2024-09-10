@@ -179,13 +179,15 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     return retval;
 }
 
-long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+long aesd_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
     struct aesd_dev *aesd_device = (struct aesd_dev*)filp->private_data;
     struct aesd_seekto tmp;
     int i;
     loff_t f_pos = 0;
     unsigned char total_cmds;
+    
+    PDEBUG("command: %d - expect: %ld", cmd, AESDCHAR_IOCSEEKTO);
 
     switch (cmd)
     {
@@ -210,7 +212,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     default:
         return -ENOTTY;
     }
-    PDEBUG("ioctl pos: %ld", f_pos);
+    PDEBUG("ioctl pos: %lld", f_pos);
     filp->f_pos = f_pos;
     return 0;
 }
@@ -222,7 +224,7 @@ struct file_operations aesd_fops = {
     .open           = aesd_open,
     .release        = aesd_release,
     .llseek         = aesd_llseek,
-    .unlocked_ioctl = aesd_ioctl,
+    .unlocked_ioctl = aesd_unlocked_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)
