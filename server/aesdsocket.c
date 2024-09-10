@@ -184,40 +184,56 @@ void* thread_func(void *param)
 
     pthread_mutex_lock(shared_data.mutex);
     if (sscanf(buffer, "AESDCHAR_IOCSEEKTO:%u,%u", &tmp.write_cmd, &tmp.write_cmd_offset)) {
+        file_size = lseek(shared_data.fd, 0, SEEK_END);
         if (ioctl(shared_data.fd, AESDCHAR_IOCSEEKTO , &tmp) == -1) {
             syslog(LOG_USER, "ioctl fail\r\n");
             pthread_mutex_unlock(shared_data.mutex);
             data->success = 2;
+	    free(buffer);
+            return param;
+        }
+	file_size -= lseek(shared_data.fd, 0, SEEK_CUR);
+        buffer = realloc(buffer, file_size);
+        memset(buffer, 0, file_size);
+        ret = read(shared_data.fd, buffer, file_size);
+        if (ret < 0) {
+            printf("Read fail\r\n");
+            pthread_mutex_unlock(shared_data.mutex);
+            data->success = 2;
+            free(buffer);
             return param;
         }
     }
     else {
-            ret = write(shared_data.fd, buffer, total);
-            if (ret < total) {
-                printf("Write to output fail\r\n");
+        ret = write(shared_data.fd, buffer, total);
+        if (ret < total) {
+            printf("Write to output fail\r\n");
             syslog(LOG_USER, "Write to output fail\r\n");
             pthread_mutex_unlock(shared_data.mutex);
             data->success = 2;
+	    free(buffer);
             return param;
         }
-    }
-    file_size = lseek(shared_data.fd, 0, SEEK_END);
+        file_size = lseek(shared_data.fd, 0, SEEK_END);
 
-    if (lseek(shared_data.fd, 0, SEEK_SET) == -1) {
-        printf("lseek fail\r\n");
-        pthread_mutex_unlock(shared_data.mutex);
-        data->success = 2;
-        return param;
-    }
+        if (lseek(shared_data.fd, 0, SEEK_SET) == -1) {
+            printf("lseek fail\r\n");
+            pthread_mutex_unlock(shared_data.mutex);
+            data->success = 2;
+	    free(buffer);
+            return param;
+        }
 
-    buffer = realloc(buffer, file_size);
-    memset(buffer, 0, file_size);
-    ret = read(shared_data.fd, buffer, file_size);
-    if (ret < 0) {
-        printf("Read fail\r\n");
-        pthread_mutex_unlock(shared_data.mutex);
-        data->success = 2;
-        return param;
+        buffer = realloc(buffer, file_size);
+        memset(buffer, 0, file_size);
+        ret = read(shared_data.fd, buffer, file_size);
+        if (ret < 0) {
+            printf("Read fail\r\n");
+            pthread_mutex_unlock(shared_data.mutex);
+            data->success = 2;
+	    free(buffer);
+            return param;
+        }
     }
     pthread_mutex_unlock(shared_data.mutex);
     send(data->cli_fd, buffer, ret, 0);
