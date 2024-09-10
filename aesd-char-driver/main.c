@@ -210,6 +210,7 @@ long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     default:
         return -ENOTTY;
     }
+    pr_err("ioctl pos: %ld", f_pos);
     filp->f_pos = f_pos;
     return f_pos;
 }
